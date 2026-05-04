@@ -9,7 +9,7 @@ function TabBarIcon(props: {
   name: React.ComponentProps<typeof FontAwesome>['name'];
   color: string;
 }) {
-  return <FontAwesome size={24} style={{ marginBottom: -3 }} {...props} />;
+  return <FontAwesome size={22} style={{ marginBottom: -3 }} {...props} />;
 }
 
 export default function TabLayout() {
@@ -27,20 +27,10 @@ export default function TabLayout() {
           height: Platform.OS === 'ios' ? 88 : 64,
         },
         tabBarLabelStyle: {
-          fontSize: 11,
-          fontWeight: '600',
-        },
-        headerStyle: {
-          backgroundColor: Brand.background,
-          elevation: 0,
-          shadowOpacity: 0,
-          borderBottomWidth: 0,
-        },
-        headerTitleStyle: {
+          fontSize: 10,
           fontWeight: '700',
-          fontSize: 18,
-          color: Brand.dark,
         },
+        headerShown: false,
       }}>
       <Tabs.Screen
         name="index"
@@ -50,10 +40,10 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="connections"
+        name="city"
         options={{
-          title: 'Connections',
-          tabBarIcon: ({ color }) => <TabBarIcon name="users" color={color} />,
+          title: 'City',
+          tabBarIcon: ({ color }) => <TabBarIcon name="comments" color={color} />,
         }}
       />
       <Tabs.Screen
@@ -64,9 +54,16 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="connections"
+        options={{
+          title: 'Circle',
+          tabBarIcon: ({ color }) => <TabBarIcon name="users" color={color} />,
+        }}
+      />
+      <Tabs.Screen
         name="profile"
         options={{
-          title: 'Profile',
+          title: 'You',
           tabBarIcon: ({ color }) => <TabBarIcon name="user" color={color} />,
         }}
       />

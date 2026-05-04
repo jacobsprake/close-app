@@ -56,6 +56,10 @@ export default function RootLayout() {
       <StatusBar style="dark" />
       <Stack>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="profile/[id]" options={{ headerTransparent: true }} />
+        <Stack.Screen name="plan/new" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="rate/[id]" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="premium" options={{ presentation: 'modal' }} />
       </Stack>
     </ThemeProvider>
   );

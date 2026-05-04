@@ -7,76 +7,21 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { router } from 'expo-router';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
+
 import { Brand } from '@/constants/Colors';
+import { NEARBY_PEOPLE, NearbyPerson, getVibeTag } from '@/constants/data';
 
-interface Connection {
-  id: string;
-  name: string;
-  location: string;
-  firstMet: string;
-  daysSinceMet: number;
-  encounters: number;   // total times near each other
-  lastEncounterDaysAgo: number;
-}
-
-const MOCK_CONNECTIONS: Connection[] = [
-  {
-    id: '1',
-    name: 'Elena Rossi',
-    location: 'WeWork Milano',
-    firstMet: 'Mar 12, 2026',
-    daysSinceMet: 17,
-    encounters: 8,
-    lastEncounterDaysAgo: 1,
-  },
-  {
-    id: '2',
-    name: 'Marco Bianchi',
-    location: 'Parco Sempione',
-    firstMet: 'Mar 5, 2026',
-    daysSinceMet: 24,
-    encounters: 5,
-    lastEncounterDaysAgo: 3,
-  },
-  {
-    id: '3',
-    name: 'Sofia Conti',
-    location: 'Starbucks Reserve',
-    firstMet: 'Feb 25, 2026',
-    daysSinceMet: 32,
-    encounters: 3,
-    lastEncounterDaysAgo: 26,
-  },
-  {
-    id: '4',
-    name: 'Luca Moretti',
-    location: 'Navigli District',
-    firstMet: 'Mar 20, 2026',
-    daysSinceMet: 9,
-    encounters: 12,
-    lastEncounterDaysAgo: 0,
-  },
-  {
-    id: '5',
-    name: 'Chiara Lombardi',
-    location: 'Fondazione Prada',
-    firstMet: 'Feb 28, 2026',
-    daysSinceMet: 29,
-    encounters: 2,
-    lastEncounterDaysAgo: 27,
-  },
-];
-
-function getStrengthInfo(encounters: number): { label: string; color: string; bars: number } {
+function getStrengthInfo(encounters: number): {
+  label: string;
+  color: string;
+  bars: number;
+} {
   if (encounters >= 10) return { label: 'Strong', color: Brand.blue, bars: 4 };
-  if (encounters >= 6) return { label: 'Growing', color: Brand.success, bars: 3 };
-  if (encounters >= 3) return { label: 'Building', color: Brand.warning, bars: 2 };
+  if (encounters >= 6)  return { label: 'Growing', color: Brand.success, bars: 3 };
+  if (encounters >= 3)  return { label: 'Building', color: Brand.warning, bars: 2 };
   return { label: 'New', color: Brand.textSecondary, bars: 1 };
-}
-
-function isFading(lastEncounterDaysAgo: number): boolean {
-  return lastEncounterDaysAgo >= 25;
 }
 
 function StrengthBars({ bars, color }: { bars: number; color: string }) {
@@ -98,47 +43,45 @@ function StrengthBars({ bars, color }: { bars: number; color: string }) {
   );
 }
 
-function ConnectionCard({ connection }: { connection: Connection }) {
-  const strength = getStrengthInfo(connection.encounters);
-  const fading = isFading(connection.lastEncounterDaysAgo);
-  const fadingProgress = fading
-    ? Math.min((connection.lastEncounterDaysAgo - 25) / 5, 1)
-    : 0;
+function ConnectionCard({ person }: { person: NearbyPerson }) {
+  // Pretend an encounter count: derive from nightsRated for the prototype.
+  const encounters = person.nightsRated * 2 + person.mutualConnections;
+  const strength = getStrengthInfo(encounters);
+  const fading = !person.isHere && person.appearedMinsAgo > 60 * 24 * 25;
 
   return (
-    <View
-      style={[
-        styles.connectionCard,
-        fading && { opacity: 1 - fadingProgress * 0.4 },
-      ]}
+    <TouchableOpacity
+      style={styles.connectionCard}
+      activeOpacity={0.9}
+      onPress={() => router.push(`/profile/${person.id}` as any)}
     >
-      {/* Fading indicator */}
-      {fading && (
-        <View style={styles.fadingBanner}>
-          <FontAwesome name="clock-o" size={11} color={Brand.fading} />
-          <Text style={styles.fadingText}>
-            Fading {connection.lastEncounterDaysAgo >= 30 ? 'soon' : `in ${30 - connection.lastEncounterDaysAgo}d`}
-          </Text>
-        </View>
-      )}
-
       <View style={styles.cardTop}>
-        {/* Avatar placeholder */}
-        <View style={[styles.avatar, fading && { borderColor: Brand.fading }]}>
+        <View
+          style={[
+            styles.avatar,
+            { backgroundColor: person.photoColor, borderColor: person.photoColor },
+          ]}
+        >
           <Text style={styles.avatarText}>
-            {connection.name.split(' ').map((n) => n[0]).join('')}
+            {person.name
+              .split(' ')
+              .map((n) => n[0])
+              .join('')}
           </Text>
         </View>
 
         <View style={styles.cardInfo}>
-          <Text style={styles.connectionName}>{connection.name}</Text>
-          <View style={styles.locationRow}>
-            <FontAwesome name="map-pin" size={11} color={Brand.textSecondary} />
-            <Text style={styles.locationText}>{connection.location}</Text>
+          <Text style={styles.connectionName}>{person.name}</Text>
+          <Text style={styles.connectionRole} numberOfLines={1}>
+            {person.role}
+          </Text>
+          <View style={styles.nightVibeRow}>
+            <FontAwesome name="moon-o" size={11} color={Brand.warning} />
+            <Text style={styles.nightVibeNumber}>{person.nightVibe.toFixed(1)}</Text>
+            <Text style={styles.nightVibeMeta}>· {person.nightsRated} nights together</Text>
           </View>
         </View>
 
-        {/* Strength indicator */}
         <View style={styles.strengthContainer}>
           <StrengthBars bars={strength.bars} color={strength.color} />
           <Text style={[styles.strengthLabel, { color: strength.color }]}>
@@ -147,27 +90,60 @@ function ConnectionCard({ connection }: { connection: Connection }) {
         </View>
       </View>
 
-      <View style={styles.cardBottom}>
-        <View style={styles.metaItem}>
-          <FontAwesome name="calendar" size={12} color={Brand.textSecondary} />
-          <Text style={styles.metaText}>Met {connection.firstMet}</Text>
-        </View>
-        <View style={styles.metaItem}>
-          <FontAwesome name="exchange" size={12} color={Brand.textSecondary} />
-          <Text style={styles.metaText}>{connection.encounters} encounters</Text>
-        </View>
+      {/* Top vibes others gave them */}
+      <View style={styles.vibeRow}>
+        {person.vibeTagIds.slice(0, 3).map((vid) => {
+          const tag = getVibeTag(vid);
+          if (!tag) return null;
+          return (
+            <View
+              key={vid}
+              style={[
+                styles.vibeChip,
+                { backgroundColor: tag.color + '15', borderColor: tag.color + '50' },
+              ]}
+            >
+              <FontAwesome name={tag.emoji as any} size={10} color={tag.color} />
+              <Text style={[styles.vibeChipText, { color: tag.color }]}>{tag.label}</Text>
+            </View>
+          );
+        })}
       </View>
-    </View>
+
+      <View style={styles.cardActions}>
+        <TouchableOpacity
+          style={styles.actionButton}
+          onPress={() => router.push(`/rate/${person.id}` as any)}
+          activeOpacity={0.85}
+        >
+          <FontAwesome name="bolt" size={11} color={Brand.orange} />
+          <Text style={[styles.actionText, { color: Brand.orange }]}>Pin a vibe</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.actionButton} activeOpacity={0.85}>
+          <FontAwesome name="comment-o" size={11} color={Brand.blue} />
+          <Text style={[styles.actionText, { color: Brand.blue }]}>Message</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.actionButton}
+          onPress={() => router.push('/plan/new' as any)}
+          activeOpacity={0.85}
+        >
+          <FontAwesome name="calendar-plus-o" size={11} color={Brand.success} />
+          <Text style={[styles.actionText, { color: Brand.success }]}>Invite out</Text>
+        </TouchableOpacity>
+      </View>
+    </TouchableOpacity>
   );
 }
 
 export default function ConnectionsScreen() {
-  const activeCount = MOCK_CONNECTIONS.filter(
-    (c) => !isFading(c.lastEncounterDaysAgo)
-  ).length;
-  const fadingCount = MOCK_CONNECTIONS.filter(
-    (c) => isFading(c.lastEncounterDaysAgo)
-  ).length;
+  // Treat anyone with a connection or who appeared recently as a connection.
+  const connections = NEARBY_PEOPLE.filter((p) => p.isConnected || p.nightsRated >= 3);
+  const totalNights = connections.reduce((s, p) => s + p.nightsRated, 0);
+  const avgVibe =
+    connections.length > 0
+      ? connections.reduce((s, p) => s + p.nightVibe, 0) / connections.length
+      : 0;
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -176,42 +152,39 @@ export default function ConnectionsScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Connections</Text>
+          <Text style={styles.headerTitle}>Your circle</Text>
           <Text style={styles.headerSubtitle}>
-            People you've met in real life
+            People you’ve actually been around
           </Text>
         </View>
 
-        {/* Stats row */}
         <View style={styles.statsRow}>
           <View style={styles.statCard}>
-            <Text style={styles.statNumber}>{MOCK_CONNECTIONS.length}</Text>
-            <Text style={styles.statLabel}>Total</Text>
+            <Text style={styles.statNumber}>{connections.length}</Text>
+            <Text style={styles.statLabel}>Connections</Text>
+          </View>
+          <View style={styles.statCard}>
+            <Text style={[styles.statNumber, { color: Brand.warning }]}>
+              {avgVibe.toFixed(1)}
+            </Text>
+            <Text style={styles.statLabel}>Avg vibe</Text>
           </View>
           <View style={styles.statCard}>
             <Text style={[styles.statNumber, { color: Brand.success }]}>
-              {activeCount}
+              {totalNights}
             </Text>
-            <Text style={styles.statLabel}>Active</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={[styles.statNumber, { color: Brand.fading }]}>
-              {fadingCount}
-            </Text>
-            <Text style={styles.statLabel}>Fading</Text>
+            <Text style={styles.statLabel}>Nights out</Text>
           </View>
         </View>
 
-        {/* Connections list */}
-        {MOCK_CONNECTIONS.map((connection) => (
-          <ConnectionCard key={connection.id} connection={connection} />
+        {connections.map((person) => (
+          <ConnectionCard key={person.id} person={person} />
         ))}
 
-        {/* Info note */}
         <View style={styles.infoNote}>
           <FontAwesome name="info-circle" size={14} color={Brand.textSecondary} />
           <Text style={styles.infoText}>
-            Connections fade after 30 days without a nearby encounter. Meet again to keep them alive.
+            Connections fade after 30 days without an encounter or shared night out. Real life keeps them alive.
           </Text>
         </View>
       </ScrollView>
@@ -220,13 +193,8 @@ export default function ConnectionsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Brand.background,
-  },
-  scrollContent: {
-    paddingBottom: 32,
-  },
+  container: { flex: 1, backgroundColor: Brand.background },
+  scrollContent: { paddingBottom: 32 },
   header: {
     paddingHorizontal: 24,
     paddingTop: 8,
@@ -238,7 +206,7 @@ const styles = StyleSheet.create({
     color: Brand.dark,
   },
   headerSubtitle: {
-    fontSize: 14,
+    fontSize: 13,
     color: Brand.textSecondary,
     marginTop: 2,
   },
@@ -266,9 +234,9 @@ const styles = StyleSheet.create({
     color: Brand.blue,
   },
   statLabel: {
-    fontSize: 12,
+    fontSize: 11,
     color: Brand.textSecondary,
-    fontWeight: '600',
+    fontWeight: '700',
     marginTop: 2,
   },
   connectionCard: {
@@ -283,22 +251,6 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 2,
   },
-  fadingBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 179, 71, 0.1)',
-    alignSelf: 'flex-start',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 10,
-    marginBottom: 10,
-  },
-  fadingText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: Brand.fading,
-    marginLeft: 4,
-  },
   cardTop: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -307,35 +259,43 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: 'rgba(74, 124, 255, 0.1)',
     borderWidth: 2,
-    borderColor: Brand.blue,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
   },
   avatarText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: Brand.blue,
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#FFFFFF',
   },
   cardInfo: {
     flex: 1,
   },
   connectionName: {
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: '800',
     color: Brand.dark,
   },
-  locationRow: {
+  connectionRole: {
+    fontSize: 12,
+    color: Brand.textSecondary,
+    marginTop: 2,
+  },
+  nightVibeRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 3,
+    marginTop: 6,
+    gap: 4,
   },
-  locationText: {
-    fontSize: 13,
+  nightVibeNumber: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: Brand.dark,
+  },
+  nightVibeMeta: {
+    fontSize: 11,
     color: Brand.textSecondary,
-    marginLeft: 4,
   },
   strengthContainer: {
     alignItems: 'center',
@@ -351,25 +311,49 @@ const styles = StyleSheet.create({
   },
   strengthLabel: {
     fontSize: 10,
-    fontWeight: '700',
+    fontWeight: '800',
     marginTop: 3,
   },
-  cardBottom: {
+  vibeRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 12,
+    gap: 6,
+  },
+  vibeChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 10,
+    borderWidth: 1,
+    gap: 4,
+  },
+  vibeChipText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  cardActions: {
     flexDirection: 'row',
     marginTop: 12,
     paddingTop: 12,
     borderTopWidth: 1,
     borderTopColor: Brand.border,
-    gap: 20,
+    gap: 8,
   },
-  metaItem: {
+  actionButton: {
+    flex: 1,
     flexDirection: 'row',
+    justifyContent: 'center',
     alignItems: 'center',
+    paddingVertical: 8,
+    borderRadius: 12,
+    backgroundColor: Brand.background,
+    gap: 5,
   },
-  metaText: {
-    fontSize: 12,
-    color: Brand.textSecondary,
-    marginLeft: 6,
+  actionText: {
+    fontSize: 11,
+    fontWeight: '800',
   },
   infoNote: {
     flexDirection: 'row',
@@ -379,12 +363,12 @@ const styles = StyleSheet.create({
     padding: 14,
     backgroundColor: 'rgba(74, 124, 255, 0.06)',
     borderRadius: 12,
+    gap: 8,
   },
   infoText: {
-    fontSize: 13,
+    fontSize: 12,
     color: Brand.textSecondary,
-    marginLeft: 8,
     flex: 1,
-    lineHeight: 18,
+    lineHeight: 17,
   },
 });

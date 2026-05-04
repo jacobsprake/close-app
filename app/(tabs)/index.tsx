@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   StyleSheet,
   View,
@@ -9,45 +9,29 @@ import {
   Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { router } from 'expo-router';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
+
 import { Brand } from '@/constants/Colors';
+import { NEARBY_PEOPLE, NearbyPerson, getVibeTag } from '@/constants/data';
 
 const { width } = Dimensions.get('window');
 
-interface Encounter {
-  id: string;
-  location: string;
-  timeAgo: string;
-  connected: boolean;
-  peopleCount: number;
-}
-
-const MOCK_ENCOUNTERS: Encounter[] = [
-  { id: '1', location: 'Starbucks Reserve', timeAgo: '2 min ago', connected: false, peopleCount: 2 },
-  { id: '2', location: 'WeWork Milano', timeAgo: '15 min ago', connected: true, peopleCount: 1 },
-  { id: '3', location: 'Parco Sempione', timeAgo: '1 hour ago', connected: false, peopleCount: 3 },
-  { id: '4', location: 'Fondazione Prada', timeAgo: '3 hours ago', connected: true, peopleCount: 1 },
-  { id: '5', location: 'Navigli District', timeAgo: '5 hours ago', connected: false, peopleCount: 2 },
-  { id: '6', location: 'Biblioteca Ambrosiana', timeAgo: 'Yesterday', connected: false, peopleCount: 1 },
-];
-
-function PulsingRadar() {
+function PulsingRadar({ count }: { count: number }) {
   const pulse1 = useRef(new Animated.Value(0)).current;
   const pulse2 = useRef(new Animated.Value(0)).current;
   const pulse3 = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    const createPulse = (anim: Animated.Value, delay: number) => {
-      return Animated.loop(
+    const createPulse = (anim: Animated.Value, delay: number) =>
+      Animated.loop(
         Animated.sequence([
           Animated.delay(delay),
-          Animated.parallel([
-            Animated.timing(anim, {
-              toValue: 1,
-              duration: 2000,
-              useNativeDriver: true,
-            }),
-          ]),
+          Animated.timing(anim, {
+            toValue: 1,
+            duration: 2200,
+            useNativeDriver: true,
+          }),
           Animated.timing(anim, {
             toValue: 0,
             duration: 0,
@@ -55,11 +39,10 @@ function PulsingRadar() {
           }),
         ]),
       );
-    };
 
     const a1 = createPulse(pulse1, 0);
-    const a2 = createPulse(pulse2, 666);
-    const a3 = createPulse(pulse3, 1333);
+    const a2 = createPulse(pulse2, 733);
+    const a3 = createPulse(pulse3, 1466);
     a1.start();
     a2.start();
     a3.start();
@@ -72,24 +55,11 @@ function PulsingRadar() {
   }, []);
 
   const renderRing = (anim: Animated.Value) => {
-    const scale = anim.interpolate({
-      inputRange: [0, 1],
-      outputRange: [0.3, 1],
-    });
-    const opacity = anim.interpolate({
-      inputRange: [0, 1],
-      outputRange: [0.6, 0],
-    });
-
+    const scale = anim.interpolate({ inputRange: [0, 1], outputRange: [0.3, 1] });
+    const opacity = anim.interpolate({ inputRange: [0, 1], outputRange: [0.7, 0] });
     return (
       <Animated.View
-        style={[
-          styles.pulseRing,
-          {
-            transform: [{ scale }],
-            opacity,
-          },
-        ]}
+        style={[styles.pulseRing, { transform: [{ scale }], opacity }]}
       />
     );
   };
@@ -100,90 +70,259 @@ function PulsingRadar() {
       {renderRing(pulse2)}
       {renderRing(pulse3)}
       <View style={styles.radarCenter}>
-        <FontAwesome name="wifi" size={28} color="#FFFFFF" />
+        <Text style={styles.radarCenterCount}>{count}</Text>
+        <Text style={styles.radarCenterLabel}>here</Text>
       </View>
     </View>
   );
 }
 
-function EncounterCard({ encounter }: { encounter: Encounter }) {
+function SignalIcon({ signal }: { signal: NearbyPerson['signal'] }) {
+  const icon =
+    signal === 'bluetooth' ? 'bluetooth-b' : signal === 'nearby' ? 'wifi' : 'location-arrow';
+  return <FontAwesome name={icon as any} size={10} color={Brand.blue} />;
+}
+
+function VibeChip({ vibeId, mini }: { vibeId: string; mini?: boolean }) {
+  const tag = getVibeTag(vibeId);
+  if (!tag) return null;
   return (
-    <View style={styles.encounterCard}>
-      <View style={styles.encounterLeft}>
-        <View style={styles.encounterIcon}>
-          <FontAwesome name="map-pin" size={14} color={Brand.blue} />
-        </View>
-        <View style={styles.encounterInfo}>
-          <Text style={styles.encounterLocation}>
-            {encounter.peopleCount > 1
-              ? `${encounter.peopleCount} people at ${encounter.location}`
-              : `Someone at ${encounter.location}`}
-          </Text>
-          <Text style={styles.encounterTime}>{encounter.timeAgo}</Text>
-        </View>
-      </View>
-      {encounter.connected ? (
-        <View style={styles.connectedBadge}>
-          <FontAwesome name="check" size={12} color={Brand.success} />
-          <Text style={styles.connectedText}>Connected</Text>
-        </View>
-      ) : (
-        <TouchableOpacity style={styles.connectButton}>
-          <Text style={styles.connectButtonText}>Connect</Text>
-        </TouchableOpacity>
-      )}
+    <View
+      style={[
+        styles.vibeChip,
+        mini && styles.vibeChipMini,
+        { backgroundColor: tag.color + '1A', borderColor: tag.color + '55' },
+      ]}
+    >
+      <FontAwesome name={tag.emoji as any} size={mini ? 9 : 11} color={tag.color} />
+      <Text style={[styles.vibeChipText, mini && styles.vibeChipTextMini, { color: tag.color }]}>
+        {tag.label}
+      </Text>
     </View>
+  );
+}
+
+function PersonAvatar({ person, size = 56 }: { person: NearbyPerson; size?: number }) {
+  return (
+    <View
+      style={{
+        width: size,
+        height: size,
+        borderRadius: size / 2,
+        backgroundColor: person.photoColor,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 2,
+        borderColor: '#FFFFFF',
+        shadowColor: person.photoColor,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.3,
+        shadowRadius: 6,
+      }}
+    >
+      <Text
+        style={{
+          color: '#FFFFFF',
+          fontSize: size * 0.36,
+          fontWeight: '800',
+        }}
+      >
+        {person.name
+          .split(' ')
+          .map((n) => n[0])
+          .join('')}
+      </Text>
+    </View>
+  );
+}
+
+function NightVibeStars({ rating, nights }: { rating: number; nights: number }) {
+  return (
+    <View style={styles.nightVibeRow}>
+      <FontAwesome name="moon-o" size={11} color={Brand.warning} />
+      <Text style={styles.nightVibeNumber}>{rating.toFixed(1)}</Text>
+      <Text style={styles.nightVibeMeta}>· {nights} nights</Text>
+    </View>
+  );
+}
+
+function PersonCard({
+  person,
+  onWave,
+  waved,
+}: {
+  person: NearbyPerson;
+  onWave: () => void;
+  waved: boolean;
+}) {
+  return (
+    <TouchableOpacity
+      activeOpacity={0.9}
+      style={styles.personCard}
+      onPress={() => router.push(`/profile/${person.id}` as any)}
+    >
+      <View style={styles.personCardTop}>
+        <View style={styles.personLeft}>
+          <PersonAvatar person={person} />
+          {person.isHere && <View style={styles.liveBadge} />}
+        </View>
+
+        <View style={styles.personInfo}>
+          <View style={styles.personNameRow}>
+            <Text style={styles.personName}>{person.name}</Text>
+            <Text style={styles.personAge}>· {person.age}</Text>
+          </View>
+          <Text style={styles.personRole} numberOfLines={1}>
+            {person.role}
+          </Text>
+          <View style={styles.personMetaRow}>
+            <SignalIcon signal={person.signal} />
+            <Text style={styles.personDistance}>{person.distanceLabel}</Text>
+            {person.mutualConnections > 0 && (
+              <>
+                <View style={styles.metaDot} />
+                <FontAwesome name="users" size={10} color={Brand.textSecondary} />
+                <Text style={styles.personDistance}>{person.mutualConnections} mutual</Text>
+              </>
+            )}
+          </View>
+        </View>
+
+        <TouchableOpacity
+          style={[styles.waveButton, waved && styles.waveButtonActive]}
+          onPress={onWave}
+          activeOpacity={0.85}
+        >
+          <FontAwesome
+            name={waved ? 'check' : 'hand-paper-o'}
+            size={14}
+            color={waved ? Brand.success : Brand.blue}
+          />
+          <Text
+            style={[
+              styles.waveButtonText,
+              waved && { color: Brand.success },
+            ]}
+          >
+            {waved ? 'Sent' : 'Wave'}
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.personVibeRow}>
+        {person.vibeTagIds.slice(0, 3).map((vid) => (
+          <VibeChip key={vid} vibeId={vid} mini />
+        ))}
+      </View>
+
+      <View style={styles.personCardBottom}>
+        <NightVibeStars rating={person.nightVibe} nights={person.nightsRated} />
+        {person.isConnected && (
+          <View style={styles.connectedPill}>
+            <FontAwesome name="check" size={9} color={Brand.success} />
+            <Text style={styles.connectedPillText}>Connected</Text>
+          </View>
+        )}
+      </View>
+    </TouchableOpacity>
   );
 }
 
 export default function NearbyScreen() {
+  const [waved, setWaved] = useState<Record<string, boolean>>({});
+  const [filter, setFilter] = useState<'here' | 'today'>('here');
+
+  const filtered = useMemo(() => {
+    return filter === 'here'
+      ? NEARBY_PEOPLE.filter((p) => p.isHere)
+      : NEARBY_PEOPLE;
+  }, [filter]);
+
+  const hereCount = NEARBY_PEOPLE.filter((p) => p.isHere).length;
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>CLOSE</Text>
-          <Text style={styles.headerSubtitle}>Proximity Network</Text>
+          <View>
+            <Text style={styles.headerTitle}>CLOSE</Text>
+            <Text style={styles.headerSubtitle}>Milano · who’s near you right now</Text>
+          </View>
+          <TouchableOpacity
+            style={styles.headerButton}
+            onPress={() => router.push('/premium' as any)}
+            activeOpacity={0.85}
+          >
+            <FontAwesome name="bolt" size={14} color={Brand.orange} />
+            <Text style={styles.headerButtonText}>Plus</Text>
+          </TouchableOpacity>
         </View>
 
-        {/* Radar */}
-        <PulsingRadar />
-        <Text style={styles.discoveringText}>Discovering nearby...</Text>
+        <PulsingRadar count={hereCount} />
+        <Text style={styles.discoveringText}>Scanning Bluetooth + Nearby</Text>
 
-        {/* Nearby count */}
-        <View style={styles.nearbyCountContainer}>
-          <View style={styles.nearbyCountDot} />
-          <Text style={styles.nearbyCountText}>3 people nearby right now</Text>
+        <View style={styles.filterRow}>
+          <TouchableOpacity
+            style={[styles.filterChip, filter === 'here' && styles.filterChipActive]}
+            onPress={() => setFilter('here')}
+          >
+            <View style={styles.liveDot} />
+            <Text
+              style={[
+                styles.filterChipText,
+                filter === 'here' && styles.filterChipTextActive,
+              ]}
+            >
+              Here now · {hereCount}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.filterChip, filter === 'today' && styles.filterChipActive]}
+            onPress={() => setFilter('today')}
+          >
+            <Text
+              style={[
+                styles.filterChipText,
+                filter === 'today' && styles.filterChipTextActive,
+              ]}
+            >
+              Today · {NEARBY_PEOPLE.length}
+            </Text>
+          </TouchableOpacity>
         </View>
 
-        {/* Recent Encounters */}
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Recent Encounters</Text>
-          <Text style={styles.sectionCount}>{MOCK_ENCOUNTERS.length}</Text>
-        </View>
-
-        {MOCK_ENCOUNTERS.map((encounter) => (
-          <EncounterCard key={encounter.id} encounter={encounter} />
+        {filtered.map((person) => (
+          <PersonCard
+            key={person.id}
+            person={person}
+            waved={!!waved[person.id]}
+            onWave={() => setWaved((s) => ({ ...s, [person.id]: !s[person.id] }))}
+          />
         ))}
+
+        <View style={styles.privacyNote}>
+          <FontAwesome name="shield" size={13} color={Brand.textSecondary} />
+          <Text style={styles.privacyText}>
+            Your profile is only visible to people physically near you. Walk away and you disappear.
+          </Text>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-const RADAR_SIZE = width * 0.55;
+const RADAR_SIZE = width * 0.5;
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Brand.background,
-  },
-  scrollContent: {
-    paddingBottom: 32,
-  },
+  container: { flex: 1, backgroundColor: Brand.background },
+  scrollContent: { paddingBottom: 32 },
   header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     paddingHorizontal: 24,
     paddingTop: 8,
     paddingBottom: 4,
@@ -195,9 +334,24 @@ const styles = StyleSheet.create({
     letterSpacing: 2,
   },
   headerSubtitle: {
-    fontSize: 14,
+    fontSize: 13,
     color: Brand.textSecondary,
     marginTop: 2,
+  },
+  headerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: '#FFF1E8',
+    borderRadius: 20,
+    gap: 6,
+  },
+  headerButtonText: {
+    color: Brand.orange,
+    fontWeight: '800',
+    fontSize: 12,
+    letterSpacing: 0.5,
   },
   radarContainer: {
     width: RADAR_SIZE,
@@ -205,8 +359,8 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 24,
-    marginBottom: 8,
+    marginTop: 18,
+    marginBottom: 6,
   },
   pulseRing: {
     position: 'absolute',
@@ -218,135 +372,240 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(74, 124, 255, 0.05)',
   },
   radarCenter: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    width: 88,
+    height: 88,
+    borderRadius: 44,
     backgroundColor: Brand.blue,
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: Brand.blue,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 16,
+    elevation: 10,
+  },
+  radarCenterCount: {
+    color: '#FFFFFF',
+    fontSize: 32,
+    fontWeight: '900',
+  },
+  radarCenterLabel: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 1,
+    marginTop: -2,
   },
   discoveringText: {
     textAlign: 'center',
-    fontSize: 15,
+    fontSize: 13,
     color: Brand.textSecondary,
-    marginBottom: 16,
+    marginBottom: 20,
   },
-  nearbyCountContainer: {
+  filterRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(74, 124, 255, 0.08)',
-    alignSelf: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    marginBottom: 24,
-  },
-  nearbyCountDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: Brand.success,
-    marginRight: 8,
-  },
-  nearbyCountText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: Brand.blue,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 24,
     marginBottom: 12,
+    gap: 8,
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: Brand.dark,
-  },
-  sectionCount: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: Brand.textSecondary,
-    backgroundColor: Brand.border,
-    paddingHorizontal: 10,
-    paddingVertical: 2,
-    borderRadius: 10,
-    overflow: 'hidden',
-  },
-  encounterCard: {
+  filterChip: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 18,
+    backgroundColor: Brand.card,
+    borderWidth: 1,
+    borderColor: Brand.border,
+    gap: 6,
+  },
+  filterChipActive: {
+    backgroundColor: Brand.blue,
+    borderColor: Brand.blue,
+  },
+  filterChipText: {
+    color: Brand.textSecondary,
+    fontWeight: '700',
+    fontSize: 13,
+  },
+  filterChipTextActive: {
+    color: '#FFFFFF',
+  },
+  liveDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: Brand.success,
+  },
+  personCard: {
     backgroundColor: Brand.card,
     marginHorizontal: 16,
-    marginBottom: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderRadius: 14,
+    marginBottom: 10,
+    borderRadius: 18,
+    padding: 14,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    elevation: 2,
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 3,
   },
-  encounterLeft: {
+  personCardTop: {
     flexDirection: 'row',
     alignItems: 'center',
-    flex: 1,
   },
-  encounterIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(74, 124, 255, 0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
+  personLeft: {
+    width: 56,
     marginRight: 12,
   },
-  encounterInfo: {
+  liveBadge: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: Brand.success,
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+  },
+  personInfo: {
     flex: 1,
   },
-  encounterLocation: {
-    fontSize: 15,
-    fontWeight: '600',
+  personNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  personName: {
+    fontSize: 16,
+    fontWeight: '800',
     color: Brand.dark,
   },
-  encounterTime: {
+  personAge: {
+    fontSize: 14,
+    color: Brand.textSecondary,
+    marginLeft: 4,
+    fontWeight: '600',
+  },
+  personRole: {
     fontSize: 13,
     color: Brand.textSecondary,
-    marginTop: 2,
+    marginTop: 1,
   },
-  connectButton: {
-    backgroundColor: Brand.blue,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
+  personMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+    gap: 4,
   },
-  connectButtonText: {
-    color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: '700',
+  personDistance: {
+    fontSize: 11,
+    color: Brand.textSecondary,
+    fontWeight: '600',
+    marginLeft: 2,
   },
-  connectedBadge: {
+  metaDot: {
+    width: 3,
+    height: 3,
+    borderRadius: 1.5,
+    backgroundColor: Brand.border,
+    marginHorizontal: 4,
+  },
+  waveButton: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    backgroundColor: 'rgba(52, 199, 89, 0.1)',
+    paddingVertical: 8,
+    backgroundColor: 'rgba(74,124,255,0.1)',
+    borderRadius: 16,
+    gap: 6,
   },
-  connectedText: {
-    color: Brand.success,
+  waveButtonActive: {
+    backgroundColor: 'rgba(52,199,89,0.12)',
+  },
+  waveButtonText: {
+    color: Brand.blue,
+    fontWeight: '800',
+    fontSize: 12,
+  },
+  personVibeRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 12,
+    gap: 6,
+  },
+  vibeChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: 5,
+  },
+  vibeChipMini: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+  },
+  vibeChipText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  vibeChipTextMini: {
+    fontSize: 11,
+  },
+  personCardBottom: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: Brand.border,
+  },
+  nightVibeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  nightVibeNumber: {
     fontSize: 13,
-    fontWeight: '600',
-    marginLeft: 4,
+    fontWeight: '800',
+    color: Brand.dark,
+  },
+  nightVibeMeta: {
+    fontSize: 12,
+    color: Brand.textSecondary,
+    marginLeft: 2,
+  },
+  connectedPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+    backgroundColor: 'rgba(52,199,89,0.1)',
+    gap: 4,
+  },
+  connectedPillText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: Brand.success,
+  },
+  privacyNote: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginHorizontal: 16,
+    marginTop: 12,
+    padding: 14,
+    backgroundColor: 'rgba(74,124,255,0.06)',
+    borderRadius: 14,
+    gap: 10,
+  },
+  privacyText: {
+    fontSize: 12,
+    color: Brand.textSecondary,
+    flex: 1,
+    lineHeight: 17,
   },
 });
