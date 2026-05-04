@@ -37,5 +37,14 @@ yarn-error.*
 *.tsbuildinfo
 
 # generated native folders
-/ios
 /android
+
+# Xcode (the iOS Swift app lives in /ios)
+ios/Close.xcodeproj
+ios/Close.xcworkspace
+ios/build/
+ios/DerivedData/
+ios/.build/
+ios/Pods/
+**/xcuserdata/
+**/*.xcuserstate
